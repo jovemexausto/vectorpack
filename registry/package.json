@@ -1,0 +1,25 @@
+{
+  "name": "@vpack/registry",
+  "version": "0.1.0",
+  "description": "VectorPack registry server — content-addressed artifact storage and query-on-registry",
+  "private": true,
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@vpack/core": "workspace:*",
+    "@vpack/engine": "workspace:*",
+    "fastify": "^4.0.0",
+    "@fastify/multipart": "^8.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "*"
+  }
+}

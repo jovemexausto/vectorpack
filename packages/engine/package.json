@@ -1,0 +1,31 @@
+{
+  "name": "@vpack/engine",
+  "version": "0.1.0",
+  "description": "VectorPack query engine — Rust implementation via napi (Phase 2).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build:native": "napi build --release --features napi --cargo-cwd ../../engine-rust --cargo-name vpack_engine ./native",
+    "build": "pnpm run build:native && tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "pretest": "pnpm run build:native",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@vpack/core": "workspace:*",
+    "hnswlib-node": "^3.0.0"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "vpack",
+  "version": "0.1.0",
+  "description": "VectorPack CLI — build, query, push, and pull knowledge artifacts",
+  "type": "module",
+  "bin": {
+    "vpack": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "scripts": {
+    "prebuild": "pnpm --filter @vpack/client build",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "pretest": "pnpm --filter @vpack/core build && pnpm --filter @vpack/engine build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "postbuild": "chmod +x dist/cli.js"
+  },
+  "dependencies": {
+    "@vpack/core": "workspace:*",
+    "@vpack/build": "workspace:*",
+    "@vpack/client": "workspace:*",
+    "@vpack/engine": "workspace:*",
+    "commander": "^12.0.0",
+    "chalk": "^5.0.0",
+    "ora": "^8.0.0",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.0",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}

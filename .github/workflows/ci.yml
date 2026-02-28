@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  nix-shell:
+    name: Nix Dev Shell
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install dependencies (Nix)
+        run: nix develop -c pnpm install --frozen-lockfile
+
+      - name: Env preflight (Nix)
+        run: nix develop -c pnpm env:check
+
+      - name: Build (Nix)
+        run: nix develop -c pnpm run build
+
+      - name: Test (Nix)
+        run: nix develop -c pnpm run test
+
+  typecheck-and-test:
+    name: Typecheck & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages (in dependency order)
+        run: |
+          pnpm --filter @vpack/core build
+          pnpm --filter @vpack/engine build
+          pnpm --filter vpack build
+          pnpm --filter @vpack/source-fs build
+          pnpm --filter @vpack/client build
+
+      - name: Typecheck all
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+  rust-engine:
+    name: Rust Engine
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine-rust
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: engine-rust
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+        working-directory: engine-rust
+
+      - name: Run tests
+        run: cargo test
+        working-directory: engine-rust

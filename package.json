@@ -1,0 +1,37 @@
+{
+  "name": "vectorpack",
+  "private": true,
+  "description": "Monorepo for the VectorPack open knowledge artifact standard",
+  "scripts": {
+    "build:cli": "pnpm --filter vpack build",
+    "build:core": "pnpm --filter @vpack/core build",
+    "build:engine": "pnpm --filter @vpack/engine build",
+    "build": "turbo run build",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "dev": "turbo run dev",
+    "env:check": "./scripts/check-env.sh",
+    "format": "prettier --write \"**/*.{ts,json,md,yaml,yml}\"",
+    "lint": "turbo run lint",
+    "nix:dev": "nix --extra-experimental-features flakes --extra-experimental-features nix-command develop",
+    "postinstall": "patch-package",
+    "prebuild": "pnpm env:check",
+    "pretest": "pnpm env:check",
+    "registry:dev": "pnpm --filter @vpack/registry dev",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "vpack": "node ./scripts/vpack.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@xenova/transformers": "^2.17.2",
+    "patch-package": "^8.0.0",
+    "prettier": "^3.0.0",
+    "turbo": "^1.13.3",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,30 @@
+vpack: "1.0"
+name: "@vpack/examples-fs-docs"
+version: "1.0.0"
+description: "Load from any local documentation — a minimal VectorPack example."
+license: "MIT"
+
+plugins:
+  - kind: source
+    use: "@vpack/source-fs"
+    path: ./docs/
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/node_modules/**"
+
+  - kind: chunker
+    use: "@vpack/chunker-paragraph"
+    min_size: 2
+  
+  # - kind: embedder
+  #   use: "@vpack/embedder-fastembed"
+  #   model: sentence-transformers/all-MiniLM-L6-v2
+  #   dimensions: 384
+
+  - kind: embedder
+    use: "@vpack/embedder-xenova"
+    model: Xenova/all-MiniLM-L6-v2
+    dimensions: 384
+    provider: huggingface

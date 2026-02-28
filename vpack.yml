@@ -1,0 +1,24 @@
+vpack: "1.0"
+name: "@vpack/docs"
+version: "1.0.0"
+description: "Our own RFC knowledge artifact."
+license: "MIT"
+
+plugins:
+  - kind: source
+    use: "@vpack/source-fs"
+    path: ./docs/
+    include:
+      - "**/RFC-*.md"
+    exclude:
+      - "**/node_modules/**"
+
+  - kind: chunker
+    use: "@vpack/chunker-markdown"
+    min_size: 50
+
+  - kind: embedder
+    use: "@vpack/embedder-xenova"
+    model: Xenova/all-MiniLM-L6-v2
+    dimensions: 384
+    provider: huggingface

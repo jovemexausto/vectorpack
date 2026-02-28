@@ -1,0 +1,33 @@
+node_modules/
+dist/
+*.js.map
+*.d.ts.map
+*.tsbuildinfo
+packages/client/src/*.js
+packages/client/src/*.d.ts
+packages/client/src/*.map
+
+# Rust
+target/
+engine-rust/target/
+
+# VectorPack artifacts
+*.vpack
+packages/engine/native/
+*.node
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.worktrees/
+.turbo/

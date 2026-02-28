@@ -1,0 +1,12 @@
+{
+  "name": "vectorpack (nix)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "postCreateCommand": "nix develop -c pnpm env:check",
+  "containerEnv": {
+    "NIX_CONFIG": "experimental-features = nix-command flakes"
+  }
+}
