@@ -5,18 +5,33 @@ import remarkFrontmatter from 'remark-frontmatter'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { toString } from 'mdast-util-to-string'
 
-type Section = {
-  headingPath: string[]
-  headingDepth: number
-  nodes: unknown[]
-}
-
 export interface MarkdownChunkerConfig {
+  /** * Target maximum size of a chunk, measured in approximate words.
+   * Note: This is a proxy for tokens. A good rule of thumb is 1 word ≈ 1.3 tokens.
+   * @default 300 
+   */
   size?: number
+  /** * Number of words to overlap between sequential chunks to preserve context. 
+   * @default 40 
+   */
   overlap?: number
+  /** * Minimum words required to form a valid chunk. Smaller dangling chunks are discarded.
+   * @default 50 
+   */
   min_size?: number
+  /** * Maximum heading level to track for semantic context (e.g., 3 tracks up to ### H3).
+   * Deeper headings are treated as standard text within the parent section.
+   * @default undefined (tracks all headings)
+   */
   heading_depth_limit?: number
+  /** * If true, prepends the hierarchical heading path (e.g., `# Guide > Setup`) to each chunk. 
+   * Highly recommended for vector search retrieval.
+   * @default true 
+   */
   include_heading_prefix?: boolean
+  /** * If true, extracts basic key-value YAML frontmatter and injects it into chunk metadata.
+   * @default true 
+   */
   include_frontmatter?: boolean
 }
 
@@ -32,6 +47,14 @@ const RESERVED_METADATA_KEYS = new Set([
   'heading_depth',
 ])
 
+/**
+ * An opinionated Markdown chunker optimized for Vector Databases and RAG.
+ * * **Behaviors:**
+ * 1. **Semantic Sectioning:** Splits documents by headings, preserving the hierarchy.
+ * 2. **Context Preservation:** Prepends the heading path to every chunk so the LLM knows *where* the text came from.
+ * 3. **Atomic Code Blocks:** Attempts to keep code blocks together unless they grossly exceed the size limit.
+ * 4. **Smart Splitting:** Falls back to paragraph splitting, and then native linguistic sentence splitting (`Intl.Segmenter`) if paragraphs are too long.
+ */
 export const MarkdownChunker: VPackChunker<MarkdownChunkerConfig> = {
   async chunk(doc: RawDocument, config: MarkdownChunkerConfig, ctx: BuildContext): Promise<Chunk[]> {
     const size = config.size ?? 300
@@ -67,6 +90,12 @@ export const MarkdownChunker: VPackChunker<MarkdownChunkerConfig> = {
   },
 }
 
+type Section = {
+  headingPath: string[]
+  headingDepth: number
+  nodes: unknown[]
+}
+
 function splitSections(tree: any, headingDepthLimit?: number): Section[] {
   const sections: Section[] = []
   let currentPath: string[] = []
@@ -98,14 +127,13 @@ function splitSections(tree: any, headingDepthLimit?: number): Section[] {
       continue
     }
 
-    if (node.type === 'yaml') {
-      continue
-    }
+    if (node.type === 'yaml') continue
 
     currentNodes.push(node)
   }
 
   flush()
+  
   if (sections.length === 0 && currentNodes.length === 0) {
     sections.push({ headingPath: [], headingDepth: 0, nodes: [] })
   }
@@ -113,6 +141,10 @@ function splitSections(tree: any, headingDepthLimit?: number): Section[] {
   return sections
 }
 
+/**
+ * Extracts basic shallow key-value pairs from YAML.
+ * Note: For production environments with complex YAML, consider using `js-yaml`.
+ */
 function extractFrontmatter(tree: any): Record<string, unknown> {
   const output: Record<string, unknown> = {}
   const children: any[] = Array.isArray(tree.children) ? tree.children : []
@@ -121,13 +153,12 @@ function extractFrontmatter(tree: any): Record<string, unknown> {
 
   const lines = yamlNode.value.split('\n')
   for (const line of lines) {
-    const match = line.match(/^\s*([A-Za-z0-9_.-]+)\s*:\s*(.+?)\s*$/)
+    // Improved regex to allow colons in the value string
+    const match = line.match(/^\s*([A-Za-z0-9_.-]+)\s*:\s*(.+)$/)
     if (!match) continue
     const key = match[1]
-    let value: unknown = match[2]
-    if (typeof value === 'string') {
-      value = value.replace(/^['"]|['"]$/g, '')
-    }
+    let value: string = match[2].trim()
+    value = value.replace(/^['"]|['"]$/g, '')
     output[key] = value
   }
 
@@ -153,17 +184,32 @@ function chunkSectionText(text: string, size: number, overlap: number, minSize: 
   }
 
   for (const unit of units) {
+    const unitWords = tokenize(unit.text)
+
+    // Handle code blocks explicitly
     if (unit.isCode) {
       flush()
-      if (tokenize(unit.text).length >= minSize) {
+      // If code block is absurdly large (e.g., > 2x size), we must split it to avoid breaking embedding limits
+      if (unitWords.length > size * 2) {
+         const codeLines = unit.text.split('\n')
+         let tempBlock = ''
+         for (const line of codeLines) {
+             tempBlock += line + '\n'
+             if (tokenize(tempBlock).length >= size) {
+                 chunks.push(tempBlock.trim())
+                 tempBlock = ''
+             }
+         }
+         if (tempBlock.trim().length >= minSize) chunks.push(tempBlock.trim())
+      } else if (unitWords.length >= minSize) {
         chunks.push(unit.text.trim())
       }
       continue
     }
 
-    const unitWords = tokenize(unit.text)
     if (unitWords.length === 0) continue
 
+    // If a single paragraph exceeds the chunk size, we fall back to sentence-level splitting
     if (unitWords.length > size) {
       const sentences = splitSentences(unit.text)
       for (const sentence of sentences) {
@@ -191,11 +237,7 @@ function chunkSectionText(text: string, size: number, overlap: number, minSize: 
       }
     }
 
-    if (current) {
-      current += '\n\n' + unitText.trim()
-    } else {
-      current = unitText.trim()
-    }
+    current = current ? current + '\n\n' + unitText.trim() : unitText.trim()
     currentWords = tokenize(current)
   }
 }
@@ -248,14 +290,24 @@ function splitMarkdownUnits(text: string): Array<{ text: string; isCode: boolean
     units.push({ text: codeLines.join('\n'), isCode: true })
   }
 
-  if (paragraphLines.length > 0) {
-    flushParagraphs()
-  }
+  flushParagraphs()
 
   return units
 }
 
+/**
+ * Splits text into sentences intelligently.
+ * Falls back to basic regex if Intl.Segmenter is not available in the environment.
+ */
 function splitSentences(text: string): string[] {
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' })
+    return Array.from(segmenter.segment(text))
+      .map((s) => s.segment.trim())
+      .filter(Boolean)
+  }
+  
+  // Fallback regex (prone to failing on abbreviations like e.g., Dr., etc.)
   const matches = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
   return (matches ?? []).map((s) => s.trim()).filter(Boolean)
 }
